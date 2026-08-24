@@ -79,8 +79,15 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
   });
 
   adapter.on(CUBO_EVENTS.ERROR, (payload) => {
-    log(machineConfig.machineId, 'CuboCardProvider: adapter error event', { code: payload?.code });
-    notify({ event: CUBO_EVENTS.ERROR, code: payload?.code });
+    // Confirmed real shape (see webSdkCuboAdapter.js / CUBO-INTEGRATION.md):
+    // { type: string, message: string } — there is no `code` field. Reading
+    // `.code` here silently discarded Cubo's actual error text (e.g. an
+    // auth rejection message) from both the log and the UI.
+    log(machineConfig.machineId, 'CuboCardProvider: adapter error event', {
+      type: payload?.type,
+      message: payload?.message,
+    });
+    notify({ event: CUBO_EVENTS.ERROR, type: payload?.type, message: payload?.message });
   });
 
   adapter.on(CUBO_EVENTS.TRANSACTION_RESULT, (result) => {

@@ -119,7 +119,12 @@ function handleProviderEvent(snapshot) {
       setStatus('r-connection', 'DISCONNECTED');
       break;
     case CUBO_EVENTS.ERROR:
-      log(MACHINE_ID, 'Adapter error event', { code: snapshot.code });
+      // Confirmed real shape: { type, message } — no `code` field (see
+      // CUBO-INTEGRATION.md). Showing `.message` here, same as the
+      // transactionResult/payment_pending cases below, instead of
+      // silently dropping the real text from Cubo.
+      log(MACHINE_ID, 'Adapter error event', { type: snapshot.type, message: snapshot.message });
+      setStatus('r-message', snapshot.message || '—');
       break;
     case 'payment_started':
       resetResultPanel();

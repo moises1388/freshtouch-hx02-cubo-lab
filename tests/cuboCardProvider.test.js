@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createCuboCardProvider } from '../src/payment/cuboCardProvider.js';
 import { STATES } from '../src/payment/paymentStateMachine.js';
 import { Esp32NotImplementedError } from '../src/esp32/esp32Interface.js';
+import { CUBO_EVENTS, CUBO_ERROR_TYPES } from '../src/cubo/cuboEvents.js';
 
 const machineConfig = { machineId: 'HX02-TEST', cuboPosId: 'POS-TEST', currency: 'GTQ' };
 const service = { label: 'BASIC', amount: 20 };
@@ -39,6 +40,27 @@ for (const outcome of nonSuccessOutcomes) {
     assert.throws(() => provider.requestCycle(), /Refused to request cycle start/);
   });
 }
+
+// Regression test for the logging bug found in the formal review of
+// FreshTouch CORE's sibling review of this lab: the adapter's standalone
+// 'error' event (confirmed real shape { type, message }, no `code` field)
+// used to be read as `.code` here, silently discarding Cubo's actual
+// error text. This confirms the fix propagates `.type` and `.message`
+// end-to-end from the adapter event through to what onResult() delivers.
+test('CUBO_EVENTS.ERROR: propagates type and message from the adapter event, not a nonexistent "code" field', async () => {
+  const provider = await connected(newProvider(), 'ERROR');
+
+  const errorSnapshot = await new Promise((resolve) => {
+    provider.onResult((snap) => {
+      if (snap.event === CUBO_EVENTS.ERROR) resolve(snap);
+    });
+    provider.createPayment();
+  });
+
+  assert.equal(errorSnapshot.type, CUBO_ERROR_TYPES.SDK_ERROR);
+  assert.equal(errorSnapshot.message, 'Simulated SDK error (mock).');
+  assert.equal(errorSnapshot.code, undefined, 'no debe seguir emitiendo un campo "code" que Cubo nunca envía');
+});
 
 test('outcome=PENDING: does not transition, does not authorize, and does not retry automatically', async () => {
   const provider = await connected(newProvider(), 'PENDING');
