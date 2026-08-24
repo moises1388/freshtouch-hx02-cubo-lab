@@ -1,0 +1,10 @@
+{
+  "name": "freshtouch-hx02-cubo-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated lab: Cubo QPOS Cute Web SDK payment integration for FreshTouch HX02",
+  "scripts": {
+    "test": "node --test"
+  }
+}

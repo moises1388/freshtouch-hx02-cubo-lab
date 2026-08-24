@@ -1,0 +1,27 @@
+{
+  "enabled": true,
+  "machineId": "HX02",
+  "machineName": "FreshTouch HX02",
+  "location": "PENDIENTE — confirmar con el propietario",
+  "cuboEnvironment": "sandbox",
+  "cuboPosSerial": "29600100122031610810",
+  "cuboPosId": "PENDIENTE — el S/N de la etiqueta puede no ser el mismo identificador que usa Cubo Admin internamente; confirmar si son el mismo valor",
+  "currency": "GTQ",
+  "currencyCodeIso4217": "0320",
+  "services": {
+    "basic": {
+      "label": "BASIC",
+      "amount": 20,
+      "note": "Valor inicial de la skill, sujeto a confirmacion del propietario"
+    },
+    "premium": {
+      "label": "PREMIUM",
+      "amount": 35,
+      "note": "Valor inicial de la skill, sujeto a confirmacion del propietario"
+    }
+  },
+  "esp32": {
+    "status": "not_defined",
+    "note": "Protocolo ESP32 de HX02 pendiente de definir. No asumir GPIO, IP, WebSocket, Bluetooth ni MQTT. Ver CUBO-INTEGRATION.md."
+  }
+}

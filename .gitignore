@@ -1,0 +1,13 @@
+# Secrets — never commit real credentials
+**/secrets.local.json
+**/secrets.local.js
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Node (no deps today, but keep this clean if any get added later)
+node_modules/

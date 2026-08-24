@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FreshTouch HX02 — Cubo Payment Test</title>
+<link rel="stylesheet" href="lab.css" />
+
+<!--
+  Official Cubo Web SDK — source: Cubo's own demo repo
+  (github.com/Cubo-App/cubo-pos-sdk-web-demo). Version v1.11.0 pinned
+  below because that's what the demo repo's own demo.html uses (its other
+  two docs disagree: v1.1.1 / v1.10.0 — see CUBO-INTEGRATION.md). If this
+  version turns out to be stale or the script 404s, that's real signal to
+  report back, not something to silently work around by guessing another
+  version number.
+-->
+<script src="https://sdk.cubopago.com/pos/v1.11.0/cubo-pos-sdk-web.js"></script>
+</head>
+<body>
+  <main class="lab">
+    <header class="lab-header">
+      <h1>FRESHTOUCH HX02</h1>
+      <h2>CUBO PAYMENT TEST</h2>
+    </header>
+
+    <section class="status-grid">
+      <div class="status-card">
+        <span class="label">POS</span>
+        <span class="value" id="pos-status">Disconnected</span>
+      </div>
+      <div class="status-card">
+        <span class="label">Bluetooth</span>
+        <span class="value" id="bluetooth-status">Checking…</span>
+      </div>
+      <div class="status-card">
+        <span class="label">Environment</span>
+        <span class="value" id="environment-value">SANDBOX</span>
+      </div>
+      <div class="status-card">
+        <span class="label">Machine</span>
+        <span class="value" id="machine-value">HX02</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Service</h3>
+      <div class="service-buttons">
+        <button id="service-basic" class="service-btn" data-service="basic">BASIC Q20</button>
+        <button id="service-premium" class="service-btn" data-service="premium">PREMIUM Q35</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Adapter mode (lab only)</h3>
+      <div class="mode-row">
+        <label><input type="radio" name="mode" value="mock" checked /> Simulated (no hardware)</label>
+        <label><input type="radio" name="mode" value="web-sdk" /> Real Cubo Web SDK</label>
+      </div>
+      <div id="web-sdk-fields" class="web-sdk-fields hidden">
+        <label class="api-key-label">
+          API Key (session only, never saved)
+          <input type="password" id="api-key-input" autocomplete="off" placeholder="paste sandbox API key" />
+        </label>
+      </div>
+      <div id="sdk-status" class="sdk-status"></div>
+      <div id="mock-outcome-row" class="mode-row">
+        <label>Simulated outcome
+          <select id="mock-outcome">
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="DECLINED">DECLINED (transaction_declined)</option>
+            <option value="PENDING">PENDING (do not retry)</option>
+            <option value="ERROR">ERROR (sdk_error)</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel actions">
+      <button id="connect-btn" class="action-btn">CONNECT POS</button>
+      <button id="pay-btn" class="action-btn" disabled>TEST PAYMENT</button>
+      <button id="cancel-btn" class="action-btn secondary" disabled>CANCEL PAYMENT</button>
+      <button id="retry-btn" class="action-btn secondary" disabled>RETRY</button>
+      <button id="disconnect-btn" class="action-btn secondary">DISCONNECT POS</button>
+      <button id="reset-btn" class="action-btn secondary">RESET</button>
+    </section>
+
+    <section class="panel">
+      <h3>Result</h3>
+      <dl class="result-grid">
+        <dt>Connection status</dt><dd id="r-connection">—</dd>
+        <dt>Payment status</dt><dd id="r-payment">IDLE</dd>
+        <dt>Cycle authorization</dt><dd id="r-cycle-auth">NOT AUTHORIZED</dd>
+        <dt>Transaction status</dt><dd id="r-transaction">—</dd>
+        <dt>Result message</dt><dd id="r-message">—</dd>
+        <dt>Transaction ID*</dt><dd id="r-txn-id">—</dd>
+      </dl>
+      <p class="footnote">* from <code>result.data</code> — its real field names are still unconfirmed against the live SDK; this is the lab's own placeholder.</p>
+    </section>
+
+    <section class="panel">
+      <h3>Diagnostic log (local only, no sensitive data)</h3>
+      <pre id="log-output" class="log-output"></pre>
+    </section>
+  </main>
+
+  <script type="module" src="lab.js"></script>
+</body>
+</html>

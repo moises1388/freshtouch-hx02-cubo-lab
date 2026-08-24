@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "machineId": "HX03",
+  "machineName": "FreshTouch HX03",
+  "location": "PENDIENTE",
+  "cuboEnvironment": "sandbox",
+  "cuboPosSerial": "PENDIENTE",
+  "cuboPosId": "PENDIENTE",
+  "currency": "GTQ",
+  "currencyCodeIso4217": "0320",
+  "services": {
+    "basic": { "label": "BASIC", "amount": 20 },
+    "premium": { "label": "PREMIUM", "amount": 35 }
+  },
+  "esp32": {
+    "status": "not_defined",
+    "note": "Plantilla — no representa una maquina real todavia. Ver MACHINE-CONFIG.md para activarla."
+  }
+}
