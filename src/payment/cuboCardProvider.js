@@ -69,14 +69,22 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
     notify({ event: CUBO_EVENTS.CONNECTED });
   });
 
-  adapter.on(CUBO_EVENTS.DISCONNECTED, () => {
+  // Shared by the adapter's own 'disconnected' event AND by an
+  // app-initiated disconnectPos() below — safe to call from either place,
+  // any number of times: it only transitions from the specific states
+  // where a disconnect is meaningful, and no-ops (still notifies) from
+  // anywhere else, so calling it twice for the same real disconnect never
+  // throws an invalid-transition error.
+  function handleDisconnected() {
     const state = session.getState();
     if (state === STATES.POS_CONNECTED) session.send('POS_DISCONNECTED');
     else if (state === STATES.WAITING_FOR_CARD || state === STATES.PROCESSING_PAYMENT) session.send('ERROR');
     // IDLE / CONNECTING_POS / already-terminal: nothing valid to transition
     // to from here — just notify, don't force a transition.
     notify({ event: CUBO_EVENTS.DISCONNECTED });
-  });
+  }
+
+  adapter.on(CUBO_EVENTS.DISCONNECTED, handleDisconnected);
 
   adapter.on(CUBO_EVENTS.ERROR, (payload) => {
     // Confirmed real shape (see webSdkCuboAdapter.js / CUBO-INTEGRATION.md):
@@ -151,8 +159,16 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
     }
   }
 
-  function disconnectPos() {
-    return adapter.disconnect();
+  // Real-hardware finding: pressing DISCONNECT POS visibly did nothing —
+  // this used to only call adapter.disconnect() and wait for the
+  // adapter's own 'disconnected' event to update state/UI. Whether the
+  // real SDK re-emits that event for an app-initiated disconnect (as
+  // opposed to the POS physically dropping the connection) is UNVERIFIED
+  // — if it doesn't, nothing here ever updated. Now transitions locally
+  // right after the call, same fail-safe pattern as cancelPayment().
+  async function disconnectPos() {
+    await adapter.disconnect();
+    handleDisconnected();
   }
 
   // Service was already fixed by selectService() — startPayment() only

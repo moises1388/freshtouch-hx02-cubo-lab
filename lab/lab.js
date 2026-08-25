@@ -39,6 +39,7 @@ console.log = (...args) => {
 
 let machineConfig = null;
 let provider = null;
+let unsubscribeProvider = null;
 let selectedServiceName = null;
 
 function setStatus(id, text) {
@@ -162,11 +163,33 @@ function handleProviderEvent(snapshot) {
 // "Real Cubo Web SDK" mode leaves the lab in a clear "not ready yet" state
 // instead of crashing mid-reset.
 function buildProvider() {
+  // Unsubscribe the OLD provider's events FIRST, before touching anything
+  // else. A real bug caught by the Playwright E2E test below: without
+  // this, a late-resolving disconnectPos() call from the old provider
+  // (see below) could still reach handleProviderEvent() after the new
+  // provider already reset the screen to IDLE, silently overwriting it
+  // back to the old provider's last state (e.g. PAYMENT_ERROR) — RESET
+  // would then never visibly settle on IDLE.
+  if (unsubscribeProvider) {
+    unsubscribeProvider();
+    unsubscribeProvider = null;
+  }
+  // Release any live POS connection from the previous provider before
+  // replacing it — otherwise RESET / switching mode orphaned the real
+  // Bluetooth connection instead of releasing it (fire-and-forget: this
+  // must not block building the new provider, and any failure here is
+  // just logged — now safe since it's unsubscribed above and can no
+  // longer touch the screen).
+  if (provider) {
+    provider.disconnectPos().catch((err) => {
+      log(MACHINE_ID, 'disconnectPos() during provider rebuild failed', { reason: err.message });
+    });
+  }
   const mode = currentMode();
   const apiKey = el('api-key-input').value.trim();
   try {
     provider = createPaymentProvider({ type: 'card', mode, machineConfig, apiKey: apiKey || undefined });
-    provider.onResult(handleProviderEvent);
+    unsubscribeProvider = provider.onResult(handleProviderEvent);
   } catch (err) {
     provider = null;
     log(MACHINE_ID, 'Payment provider not ready', { reason: err.message });
