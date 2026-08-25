@@ -131,9 +131,9 @@ manual hardware checklist that can't be automated from here.
 | 3 | Tablet detects POS | ✅ **Confirmed on real hardware** — Chrome's native Bluetooth picker showed the real QPOS Cute |
 | 4 | Tablet connects via Bluetooth | ✅ **Confirmed on real hardware** — real pairing completed |
 | 5 | POS state CONNECTED | ✅ Simulated; ✅ **real** — `pos-status: Connected`, `r-connection: CONNECTED` on real hardware |
-| 6 | Send test amount | ✅ Simulated with the real, confirmed parameter shapes; ❌ real |
-| 7 | Cubo requests card | ✅ Simulated only |
-| 8 | Result received | ✅ Simulated, using the real, confirmed `transactionResult` shape (`success`/`data`/`pending`/`error`) |
+| 6 | Send test amount | ✅ **Confirmed on real hardware** (PRODUCTION environment, Q20 BASIC) |
+| 7 | Cubo requests card | ✅ **Confirmed on real hardware** — real signature screen shown on the POS |
+| 8 | Result received | ✅ **Confirmed on real hardware** — real `PAYMENT_SUCCESS`, transaction visible in the Cubo Admin app. `result.data`'s real field names are still unconfirmed: the lab's placeholder `transactionId` key came back empty on this real success, so the actual field name(s) inside `data` remain UNVERIFIED |
 | 9 | Result shown on screen | ✅ Working in the lab UI |
 | 10 | Local debug info logged | ✅ Sensitive-safe logger + on-screen log panel |
 
@@ -142,12 +142,15 @@ this table is the short version.
 
 ## Next steps (do not start automatically)
 
-1. Generate the sandbox API key in Cubo Admin Sandbox (approved, not yet
-   generated/entered anywhere in this repo).
-2. Confirm the current SDK script version (the demo repo's own docs
-   disagree — see `CUBO-INTEGRATION.md`) and uncomment the script tag.
-3. Run this lab on the real HX02 tablet with Bluetooth and a sandbox POS —
-   `connect()` only, first, before any real `startPayment()`.
-4. Only after a real `PAYMENT_SUCCESS` is observed end-to-end: design the
-   `PAYMENT_SUCCESS → ESP32 → start cycle` protocol — a separate,
-   explicitly-approved step, and never against HX01.
+1. ~~Generate the sandbox API key~~ — sandbox never worked (see
+   `CUBO-INTEGRATION.md`'s environment note); the machine owner switched
+   `cuboEnvironment` to `production` after confirming with Cubo support.
+   **This lab now makes real charges on real cards.**
+2. ~~Confirm the current SDK script version~~ — done, v1.11.0 confirmed
+   working end-to-end on real hardware.
+3. ~~Run this lab on the real HX02 tablet~~ — done: `connect()`, and a
+   full real `PAYMENT_SUCCESS` (Q20, PRODUCTION), both confirmed.
+4. Design the `PAYMENT_SUCCESS → ESP32 → start cycle` protocol — a
+   separate, explicitly-approved step, and never against HX01. This is
+   the next real piece of work; `esp32Interface.js` still refuses on
+   purpose (`Esp32NotImplementedError`) until that protocol exists.

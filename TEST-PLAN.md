@@ -117,11 +117,22 @@ POS:
 - [ ] Disconnect mid-session (POS powered off after connecting) —
       `disconnected` event observed, UI reflects it.
 
-Payment (real card, `SANDBOX` environment, small test amount):
-- [ ] Successful tap/insert/swipe → `transactionResult.success === true`
-      → screen shows whatever `result.data` actually contains (record the
-      real field names here and update `CUBO-INTEGRATION.md`'s UNVERIFIED
-      section and `mockCuboAdapter.js`'s placeholder once observed).
+Payment (real card — `SANDBOX` never worked for this account, see the
+environment note below; testing now happens in `PRODUCTION` with real
+charges):
+- [x] **Successful tap/insert/swipe → `transactionResult.success === true`.**
+      Confirmed on the real HX02 tablet + physical QPOS Cute, `PRODUCTION`
+      environment, service BASIC (Q20): real signature screen shown on the
+      POS, `PAYMENT_SUCCESS`, `Cycle authorization: AUTHORIZED`, ESP32
+      guard correctly refused with `Esp32NotImplementedError` (transport
+      not built yet — expected). Transaction confirmed independently in
+      the Cubo Admin app. **Still not observed:** `result.data`'s real
+      field names — the lab's placeholder `data.transactionId` key came
+      back empty/undefined on this real success, so the on-screen
+      "Transaction ID" field showed `—` even though the payment worked.
+      The actual shape of `data` remains UNVERIFIED; update
+      `CUBO-INTEGRATION.md` and `mockCuboAdapter.js`'s placeholder once
+      it's captured (e.g. via a browser console log of the raw event).
 - [ ] Declined card → `error.type === 'transaction_declined'`, no
       cycle-start attempt.
 - [ ] Ambiguous/network failure during payment → observe whether
@@ -133,8 +144,14 @@ Payment (real card, `SANDBOX` environment, small test amount):
       `transactionResult`, an `error`, both, or neither — currently
       UNVERIFIED and not wired into `CuboCardProvider.cancelPayment()`.
 
-Before this checklist can run, generate a real sandbox API key in Cubo
-Admin Sandbox and confirm the current SDK script version (see
-`CUBO-INTEGRATION.md`) — the SDK identity and shapes are now confirmed
-against Cubo's official demo repo, but none of it has been run against
-real hardware yet.
+**Environment note:** three different API keys were tried against
+`SANDBOX` (one sandbox-issued, two production-issued) — all three failed
+identically with `HTTP 404 "App is not registered"`. Cubo support
+confirmed the API key is shared across their gateways and only the
+endpoint changes, and suggested checking that the key matches the
+environment being used. Since the account's app was never registered for
+the sandbox card gateway, and the owner already had a working production
+key (from the Cubo QR flow), the explicit decision was to switch
+`machines/HX02/machine.config.json`'s `cuboEnvironment` to `production`
+rather than keep chasing sandbox registration. **From that point on,
+every successful `startPayment()` in this lab is a real charge.**
