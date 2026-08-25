@@ -19,6 +19,9 @@ const NEVER_START_STATES = [
   STATES.PAYMENT_CANCELLED,
   STATES.PAYMENT_ERROR,
   STATES.PAYMENT_TIMEOUT,
+  // A cycle already in progress (i.e. this exact payment's authorization
+  // was already consumed) must never authorize a second one.
+  STATES.CYCLE_IN_PROGRESS,
 ];
 
 for (const state of NEVER_START_STATES) {

@@ -174,6 +174,93 @@ test('retryPayment outside a failure state throws', async () => {
   await assert.rejects(() => provider.retryPayment(), /has nothing to retry/);
 });
 
+// --- One payment, one cycle: the gap ChatGPT's review flagged (rule 10) ---
+
+test('a successful payment authorizes exactly one cycle; a second requestCycle() for the same payment is refused', async () => {
+  const provider = await connected(newProvider(), 'SUCCESS');
+  await provider.createPayment();
+  assert.equal(provider.canStartCycle(), true);
+
+  // First call: authorized, consumed, then hits the (expected) not-yet-
+  // implemented ESP32 transport.
+  assert.throws(() => provider.requestCycle(), Esp32NotImplementedError);
+  assert.equal(provider.getStatus(), STATES.CYCLE_IN_PROGRESS);
+  assert.equal(provider.canStartCycle(), false);
+
+  // Second call, same payment, nothing new happened: must be refused by
+  // the ordinary guard message, NOT treated as still-authorized.
+  assert.throws(() => provider.requestCycle(), /Refused to request cycle start/);
+});
+
+test('declined, cancelled, and pending payments never authorize a cycle', async () => {
+  for (const outcome of ['DECLINED', 'ERROR']) {
+    const provider = await connected(newProvider(), outcome);
+    await provider.createPayment();
+    assert.equal(provider.canStartCycle(), false);
+    assert.throws(() => provider.requestCycle(), /Refused to request cycle start/);
+  }
+
+  const pendingProvider = await connected(newProvider(), 'PENDING');
+  await new Promise((resolve) => {
+    pendingProvider.onResult((snap) => {
+      if (snap.event === 'payment_pending') resolve();
+    });
+    pendingProvider.createPayment();
+  });
+  assert.equal(pendingProvider.canStartCycle(), false);
+  assert.throws(() => pendingProvider.requestCycle(), /Refused to request cycle start/);
+});
+
+test('retrying after a failure does not carry over or improperly grant cycle authorization', async () => {
+  const provider = await connected(newProvider(), 'ERROR');
+  await provider.createPayment();
+  assert.equal(provider.getStatus(), STATES.PAYMENT_ERROR);
+  assert.equal(provider.canStartCycle(), false);
+
+  await provider.retryPayment();
+  // Reusing the connection must not, by itself, authorize anything.
+  assert.equal(provider.canStartCycle(), false);
+  assert.throws(() => provider.requestCycle(), /Refused to request cycle start/);
+
+  // Only a genuinely NEW successful payment after the retry may authorize
+  // a cycle — and it gets exactly one, same as the very first test above.
+  provider.selectService({ ...service, mockOutcome: 'SUCCESS' });
+  await provider.createPayment();
+  assert.equal(provider.canStartCycle(), true);
+  assert.throws(() => provider.requestCycle(), Esp32NotImplementedError);
+  assert.equal(provider.canStartCycle(), false);
+});
+
+test('reportCycleComplete() returns to IDLE and the next customer can pay again without reconnecting', async () => {
+  const provider = await connected(newProvider(), 'SUCCESS');
+  await provider.createPayment();
+  assert.throws(() => provider.requestCycle(), Esp32NotImplementedError);
+  assert.equal(provider.getStatus(), STATES.CYCLE_IN_PROGRESS);
+
+  provider.reportCycleComplete();
+  assert.equal(provider.getStatus(), STATES.IDLE);
+  assert.equal(provider.canStartCycle(), false);
+
+  // Next customer: select a service, connect (must reuse the still-live
+  // POS connection, no new Bluetooth pairing), and pay again.
+  let connectingSeen = false;
+  provider.onResult((snap) => {
+    if (snap.event === 'connecting') connectingSeen = true;
+  });
+  provider.selectService({ ...service, mockOutcome: 'SUCCESS' });
+  await provider.connectPos();
+  assert.equal(connectingSeen, false);
+  assert.equal(provider.getStatus(), STATES.POS_CONNECTED);
+
+  await provider.createPayment();
+  assert.equal(provider.canStartCycle(), true);
+});
+
+test('reportCycleComplete() outside CYCLE_IN_PROGRESS throws', () => {
+  const provider = newProvider();
+  assert.throws(() => provider.reportCycleComplete(), /no cycle is in progress/);
+});
+
 test('onResult unsubscribe stops further notifications', async () => {
   const provider = newProvider();
   let calls = 0;

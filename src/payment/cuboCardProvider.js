@@ -142,11 +142,25 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
     notify({ event: 'service_selected', service: service?.label });
   }
 
+  // Skips a redundant adapter.connect() call (and, on the real SDK, a new
+  // Bluetooth device picker) when the adapter still reports a live
+  // connection — e.g. carried over from a previous customer's completed
+  // cycle. This is a judgment call, not a documented SDK guarantee:
+  // calling connect() again on an already-connected real SDK instance is
+  // itself UNVERIFIED behavior (see CUBO-INTEGRATION.md). Shared by a
+  // fresh connectPos() call and by retryPayment() below, so both paths
+  // reuse a live connection identically.
   async function connectPos() {
     if (session.getState() !== STATES.PAYMENT_METHOD_SELECTED) {
       throw new Error(
         `connectPos() called from state "${session.getState()}"; selectService() must succeed first.`
       );
+    }
+    if (adapter.isConnected?.()) {
+      session.send('CONNECT_POS');
+      session.send('POS_CONNECTED');
+      notify({ event: CUBO_EVENTS.CONNECTED, reused: true });
+      return;
     }
     session.send('CONNECT_POS');
     notify({ event: 'connecting' });
@@ -215,10 +229,7 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
   // physically connected — reported real friction: after any failure, the
   // only way back to a payable state was RESET, which also tears down the
   // POS connection and re-shows the browser's Bluetooth device picker.
-  // Skipping a redundant connect() call when the adapter still reports a
-  // live connection is a judgment call, not a documented SDK guarantee —
-  // calling connect() again on an already-connected real SDK instance is
-  // itself UNVERIFIED behavior (see CUBO-INTEGRATION.md).
+  // Connection reuse itself is connectPos()'s job now (see above).
   async function retryPayment() {
     const state = session.getState();
     const retryableStates = new Set([
@@ -232,13 +243,6 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
     }
     session.send('RETRY');
     notify({ event: 'retry_ready' });
-
-    if (adapter.isConnected?.()) {
-      session.send('CONNECT_POS');
-      session.send('POS_CONNECTED');
-      notify({ event: CUBO_EVENTS.CONNECTED, reused: true });
-      return;
-    }
     await connectPos();
   }
 
@@ -246,12 +250,48 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
   // reaching PAYMENT_SUCCESS never auto-starts anything by itself. Whoever
   // holds the provider must call requestCycle() themselves after checking
   // canStartCycle() — see the Skill's security rules.
+  //
+  // Consumes the authorization (sends START_CYCLE) BEFORE calling the
+  // ESP32 guard, whenever the state actually authorizes a cycle — the same
+  // "transition first" pattern used throughout this file (e.g.
+  // createPayment()'s START_PAYMENT). Once this fires, the state is no
+  // longer PAYMENT_SUCCESS, so a second requestCycle() call for the same
+  // payment (double click, accidental retry, anything) is refused by the
+  // same canStartCycle() check the ESP32 guard already does — no separate
+  // "already used" flag needed. If the state does NOT currently authorize
+  // a cycle, this skips straight to calling the guard so it can produce
+  // its own consistent refusal message — there is nothing to consume.
   function requestCycle() {
+    // Captured BEFORE consuming — the guard must see the state that
+    // actually authorized this call, not CYCLE_IN_PROGRESS (which is what
+    // session.getState() would return immediately after consuming).
+    const state = session.getState();
+    if (canStartCycle(state)) {
+      session.send('START_CYCLE');
+      notify({ event: 'cycle_started' });
+    }
     return requestCycleStart({
       machineId: machineConfig.machineId,
-      state: session.getState(),
+      state,
       service: currentService,
     });
+  }
+
+  // Called once the physical cycle is confirmed finished, returning to a
+  // fresh IDLE ready for the next customer WITHOUT touching the POS
+  // connection — selecting a new service and calling connectPos() again
+  // will reuse it automatically (see connectPos() above) rather than
+  // forcing a new Bluetooth pairing. A real ESP32 integration must only
+  // call this once hardware actually confirms the cycle is done; today
+  // (no real transport yet) the lab calls it immediately as a stand-in —
+  // see lab.js.
+  function reportCycleComplete() {
+    const state = session.getState();
+    if (state !== STATES.CYCLE_IN_PROGRESS) {
+      throw new Error(`reportCycleComplete() called from state "${state}"; no cycle is in progress.`);
+    }
+    session.send('CYCLE_COMPLETE');
+    notify({ event: 'cycle_complete' });
   }
 
   return {
@@ -265,6 +305,7 @@ export function createCuboCardProvider({ mode, machineConfig, apiKey }) {
     getStatus: () => session.getState(),
     canStartCycle: () => canStartCycle(session.getState()),
     requestCycle,
+    reportCycleComplete,
     onResult(handler) {
       resultHandlers.add(handler);
       return () => resultHandlers.delete(handler);

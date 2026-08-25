@@ -91,6 +91,18 @@ function updateCycleAuthorization() {
     } catch (err) {
       if (err instanceof Esp32NotImplementedError) {
         log(MACHINE_ID, 'ESP32 guard passed (state=PAYMENT_SUCCESS); transport not implemented yet');
+        // Lab-only stand-in: with no real ESP32 to confirm completion,
+        // treat "guard passed, transport just isn't built yet" as the
+        // cycle being done right away, so the lab can demonstrate the
+        // full auto-return-to-ready flow ahead of the real ESP32 phase.
+        // A real integration must call reportCycleComplete() only once
+        // hardware actually confirms the physical cycle finished — never
+        // optimistically like this.
+        try {
+          provider.reportCycleComplete();
+        } catch (completeErr) {
+          log(MACHINE_ID, 'reportCycleComplete() threw', { reason: completeErr.message });
+        }
       } else {
         log(MACHINE_ID, 'ESP32 guard refused cycle start', { reason: err.message });
       }
@@ -149,6 +161,12 @@ function handleProviderEvent(snapshot) {
       setStatus('r-txn-id', result.data?.transactionId || '—');
       break;
     }
+    case 'cycle_started':
+      log(MACHINE_ID, 'Cycle authorization consumed — starting physical cycle (ESP32 not implemented yet)');
+      break;
+    case 'cycle_complete':
+      log(MACHINE_ID, 'Cycle complete — ready for next customer (POS connection kept if still alive)');
+      break;
     default:
       break;
   }

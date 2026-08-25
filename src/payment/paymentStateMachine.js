@@ -19,6 +19,13 @@ export const STATES = Object.freeze({
   PAYMENT_CANCELLED: 'PAYMENT_CANCELLED',
   PAYMENT_ERROR: 'PAYMENT_ERROR',
   PAYMENT_TIMEOUT: 'PAYMENT_TIMEOUT',
+  // Entered the instant a cycle is authorized and requested — see
+  // requestCycle() in cuboCardProvider.js. This is what closes the "one
+  // payment, one cycle" gap: canStartCycle() is a pure function of the
+  // CURRENT state, so once this fires, the state is no longer
+  // PAYMENT_SUCCESS and a second cycle request for the same payment is
+  // refused by the same guard, with no separate "already used" flag.
+  CYCLE_IN_PROGRESS: 'CYCLE_IN_PROGRESS',
 });
 
 const TERMINAL_STATES = new Set([
@@ -68,6 +75,15 @@ const TRANSITIONS = {
     ERROR: STATES.PAYMENT_ERROR,
   },
   [STATES.PAYMENT_SUCCESS]: {
+    RESET: STATES.IDLE,
+    START_CYCLE: STATES.CYCLE_IN_PROGRESS,
+  },
+  [STATES.CYCLE_IN_PROGRESS]: {
+    // CYCLE_COMPLETE is sent once the physical cycle is confirmed finished
+    // — today that's simulated by the lab immediately after the ESP32
+    // stub throws "not implemented" (see lab.js); a real ESP32 integration
+    // must only send it once hardware actually confirms completion.
+    CYCLE_COMPLETE: STATES.IDLE,
     RESET: STATES.IDLE,
   },
   [STATES.PAYMENT_DECLINED]: {
